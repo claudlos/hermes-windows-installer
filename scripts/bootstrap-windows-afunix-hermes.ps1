@@ -63,7 +63,7 @@ function Get-HermesContext {
         FromRepo = $false
         RepoRoot = $null
         Branch = 'windows-qol-v2'
-        RawBase = 'https://raw.githubusercontent.com/claudlos/hermes-agent/windows-qol-v2'
+        RawBase = 'https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main'
     }
 }
 
