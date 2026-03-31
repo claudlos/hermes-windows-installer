@@ -1,6 +1,6 @@
 # Hermes Windows Installer
 
-![Hermes on Windows](hermesonwindows.png)
+![Hermes on Windows](hermesonwindows.jpg)
 
 One-command Windows installer for [Hermes Agent](https://github.com/NousResearch/hermes-agent).
 Works standalone — does not require the main repo to be merged or changed.
