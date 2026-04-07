@@ -1,8 +1,8 @@
-
+﻿
 # ============================================================================
 #  Hermes Agent - Windows Installer (builds from current branch)
 #
-#  One-liner — paste this into any PowerShell terminal:
+#  One-liner â€” paste this into any PowerShell terminal:
 #    irm https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/install-windows.ps1 | iex
 #
 #  If you hit a TLS/SSL error, run this line first, then the one-liner above:
@@ -27,7 +27,7 @@ try {
 } catch {}
 
 $ErrorActionPreference = "Stop"
-$psVer = $PSVersionTable.PSVersion.Major; if ($psVer -ge 7) { $psVer = $PSVersionTable.PSVersion.Major; if ($psVer -ge 7) { $ProgressPreference = "Bypass" } else { $ProgressPreference = "SilentlyContinue" } } else { $ProgressPreference = "SilentlyContinue" }
+if ($PSVersionTable.PSVersion.Major -ge 7) { $ProgressPreference = "Bypass" } else { $ProgressPreference = "SilentlyContinue" }
 
 # Where to install
 $INSTALL_DIR = "$env:LOCALAPPDATA\hermes-agent"
@@ -342,7 +342,7 @@ if ($DesktopIcon -ne 'none') {
         $sc.Save()
         Write-Ok ('Desktop shortcut created ({0})' -f $DesktopIcon)
     } else {
-        Write-Dim ('Icon not found: {0} — skipping shortcut' -f $iconPath)
+        Write-Dim ('Icon not found: {0} â€” skipping shortcut' -f $iconPath)
     }
 }
 
@@ -362,7 +362,7 @@ Write-Host "  ============================================" -ForegroundColor Gre
 Write-Host "   Hermes Agent installed successfully" -ForegroundColor Green
 Write-Host "  ============================================" -ForegroundColor Green
 Write-Host ""
-Write-Host '  Next step — open a NEW terminal and run:' -ForegroundColor White
+Write-Host '  Next step â€” open a NEW terminal and run:' -ForegroundColor White
 Write-Host ''
 Write-Host '      hermes setup' -ForegroundColor Yellow
 Write-Host ''
