@@ -237,18 +237,24 @@ if ($FROM_REPO) {
         Write-Log "Installing from current directory"
     }
 } else {
-    if (Test-Path "$INSTALL_DIR\.git") {
+        if (Test-Path "$INSTALL_DIR\.git") {
         Write-Dim "Updating existing clone..."
         Write-Log "Updating existing clone..."
         Push-Location $INSTALL_DIR
         try {
-            $fetchExit = Invoke-GitQuiet @('fetch', 'origin', $BRANCH)
-            if ($fetchExit -ne 0) { Fail "git fetch failed for branch $BRANCH" }
-            $checkoutExit = Invoke-GitQuiet @('checkout', $BRANCH)
-            if ($checkoutExit -ne 0) { Fail "git checkout failed for branch $BRANCH" }
-            $pullExit = Invoke-GitQuiet @('pull', 'origin', $BRANCH)
-            if ($pullExit -ne 0) { Fail "git pull failed for branch $BRANCH" }
-            Write-Log "Pull: fetch=$fetchExit checkout=$checkoutExit pull=$pullExit"
+            $fetchExit = Invoke-GitQuiet @('fetch', 'origin', $BRANCH, '--depth', '1')
+            if ($fetchExit -ne 0) {
+                Write-Log "Fetch failed ($fetchExit) - removing and recloning"
+                Pop-Location
+                Remove-Item $INSTALL_DIR -Recurse -Force
+                $cloneExit = Invoke-GitQuiet @('clone', '--depth', '1', '--branch', $BRANCH, $REPO_URL, $INSTALL_DIR)
+                if ($cloneExit -ne 0) { Fail "Clone failed after fetch error" }
+                Push-Location $INSTALL_DIR
+            } else {
+                $resetExit = Invoke-GitQuiet @('reset', '--hard', "origin/$BRANCH")
+                Write-Log "Fetch=$fetchExit Reset=$resetExit"
+                if ($resetExit -ne 0) { Fail "git reset failed for branch $BRANCH" }
+            }
         } finally {
             Pop-Location
         }
