@@ -2,8 +2,11 @@
 # ============================================================================
 #  Hermes Agent - Windows Installer (builds from current branch)
 #
-#  One-liner:
+#  One-liner — paste this into any PowerShell terminal:
 #    irm https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/install-windows.ps1 | iex
+#
+#  If you hit a TLS/SSL error, run this line first, then the one-liner above:
+#    [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
 #
 #  Or run locally:
 #    .\scripts\install-windows.ps1
@@ -18,8 +21,13 @@ param(
     [string]$DesktopIcon = "nous"
 )
 
+# -- TLS fix (needed for irm on some Windows/AV configurations) ------------
+try {
+    [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+} catch {}
+
 $ErrorActionPreference = "Stop"
-$ProgressPreference = "SilentlyContinue"
+$ProgressPreference = "Bypass"
 
 # Where to install
 $INSTALL_DIR = "$env:LOCALAPPDATA\hermes-agent"
