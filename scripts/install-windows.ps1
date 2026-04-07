@@ -1,8 +1,7 @@
-
 # ============================================================================
 #  Hermes Agent - Windows Installer (builds from current branch)
 #
-#  One-liner â€” paste this into any PowerShell terminal:
+#  One-liner — paste this into any PowerShell terminal:
 #    irm https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/install-windows.ps1 | iex
 #
 #  If you hit a TLS/SSL error, run this line first, then the one-liner above:
@@ -18,7 +17,7 @@
 param(
     [string]$PythonExe = "",
     [ValidateSet("none", "nous", "staff")]
-    [string]$DesktopIcon = "nous"
+    [string]$DesktopIcon = "staff"
 )
 
 # -- TLS fix (needed for irm on some Windows/AV configurations) ------------
@@ -33,6 +32,7 @@ if ($PSVersionTable.PSVersion.Major -ge 7) { $ProgressPreference = "Bypass" } el
 $INSTALL_DIR = "$env:LOCALAPPDATA\hermes-agent"
 $VENV_DIR = "$INSTALL_DIR\.venv"
 $BIN_DIR = "$env:LOCALAPPDATA\Programs\hermes"
+$ICONS_DIR = "$INSTALL_DIR\icons"
 
 # Detect: are we running from inside a repo checkout, or downloaded standalone?
 $SCRIPT_PATH = $MyInvocation.MyCommand.Path
@@ -315,23 +315,46 @@ if ($userPath -notlike "*$BIN_DIR*") {
 
 # -- Step 8: Desktop shortcut ------------------------------------------------
 if ($DesktopIcon -ne 'none') {
-    Write-Step 8 'Creating desktop shortcut...'
+    Write-Step 8 "Creating desktop shortcut..."
 
-    $iconDir = $null
-    if ($SCRIPT_PATH) {
-        $iconDir = Join-Path (Split-Path -Parent $SCRIPT_PATH) 'icons'
-    }
-    if (-not $iconDir -or -not (Test-Path $iconDir)) {
-        $iconDir = Join-Path $INSTALL_DIR 'scripts\icons'
-    }
-
+    # Find or download the icon
     $iconFile = if ($DesktopIcon -eq 'staff') { 'hermes-staff.ico' } else { 'hermes-nous.ico' }
-    $iconPath = Join-Path $iconDir $iconFile
 
-    $desktopPath = [Environment]::GetFolderPath('Desktop')
-    $shortcutPath = Join-Path $desktopPath 'Hermes Agent.lnk'
+    # Try local paths first
+    $iconPath = $null
+    if ($SCRIPT_PATH) {
+        $localIcon = Join-Path (Split-Path -Parent $SCRIPT_PATH) "icons\$iconFile"
+        if (Test-Path $localIcon) { $iconPath = $localIcon }
+    }
+    if (-not $iconPath) {
+        $localIcon = Join-Path $INSTALL_DIR "scripts\icons\$iconFile"
+        if (Test-Path $localIcon) { $iconPath = $localIcon }
+    }
+    if (-not $iconPath) {
+        $localIcon = Join-Path $ICONS_DIR $iconFile
+        if (Test-Path $localIcon) { $iconPath = $localIcon }
+    }
 
-    if (Test-Path $iconPath) {
+    # Standalone / irm mode: download icon from the installer repo
+    if (-not $iconPath) {
+        Write-Dim "Downloading desktop icon..."
+        if (-not (Test-Path $ICONS_DIR)) {
+            New-Item -ItemType Directory -Path $ICONS_DIR -Force | Out-Null
+        }
+        $iconUrl = "https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/icons/$iconFile"
+        try {
+            $wc = New-Object System.Net.WebClient
+            $wc.DownloadFile($iconUrl, Join-Path $ICONS_DIR $iconFile)
+            $iconPath = Join-Path $ICONS_DIR $iconFile
+            Write-Ok "Icon downloaded ($iconFile)"
+        } catch {
+            Write-Dim "Icon download failed: $_ — skipping shortcut"
+        }
+    }
+
+    if ($iconPath -and (Test-Path $iconPath)) {
+        $desktopPath = [Environment]::GetFolderPath('Desktop')
+        $shortcutPath = Join-Path $desktopPath 'Hermes Agent.lnk'
         $ws = New-Object -ComObject WScript.Shell
         $sc = $ws.CreateShortcut($shortcutPath)
         $sc.TargetPath = 'cmd.exe'
@@ -340,20 +363,20 @@ if ($DesktopIcon -ne 'none') {
         $sc.IconLocation = $iconPath
         $sc.Description = 'Hermes Agent'
         $sc.Save()
-        Write-Ok ('Desktop shortcut created ({0})' -f $DesktopIcon)
+        Write-Ok "Desktop shortcut created ($DesktopIcon)"
     } else {
-        Write-Dim ('Icon not found: {0} â€” skipping shortcut' -f $iconPath)
+        Write-Dim "Icon not found — skipping shortcut"
     }
 }
 
 # -- Step 9: Quick verify ----------------------------------------------------
-Write-Step 9 'Verifying install...'
+Write-Step 9 "Verifying install..."
 
 $verifyOut = & $hermesExe --version 2>&1
 if ($verifyOut) {
     Write-Ok $verifyOut
 } else {
-    Write-Ok 'Binary runs'
+    Write-Ok "Binary runs"
 }
 
 # -- Done --------------------------------------------------------------------
@@ -362,15 +385,15 @@ Write-Host "  ============================================" -ForegroundColor Gre
 Write-Host "   Hermes Agent installed successfully" -ForegroundColor Green
 Write-Host "  ============================================" -ForegroundColor Green
 Write-Host ""
-Write-Host '  Next step â€” open a NEW terminal and run:' -ForegroundColor White
-Write-Host ''
-Write-Host '      hermes setup' -ForegroundColor Yellow
-Write-Host ''
-Write-Host '  This configures your API key and preferences.' -ForegroundColor DarkGray
-Write-Host ''
+Write-Host "  Next step — open a NEW terminal and run:" -ForegroundColor White
+Write-Host ""
+Write-Host "      hermes setup" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "  This configures your API key and preferences." -ForegroundColor DarkGray
+Write-Host ""
 if ($FROM_REPO) {
-    Write-Host ('  Built from: {0} ({1})' -f $SOURCE_DIR, $BRANCH) -ForegroundColor DarkGray
+    Write-Host ("  Built from: {0} ({1})" -f $SOURCE_DIR, $BRANCH) -ForegroundColor DarkGray
 }
-Write-Host ('  Installed:  {0}' -f $INSTALL_DIR) -ForegroundColor DarkGray
-Write-Host ('  Launcher:   {0}\hermes.bat' -f $BIN_DIR) -ForegroundColor DarkGray
-Write-Host ''
+Write-Host ("  Installed:  {0}" -f $INSTALL_DIR) -ForegroundColor DarkGray
+Write-Host ("  Launcher:   {0}\hermes.bat" -f $BIN_DIR) -ForegroundColor DarkGray
+Write-Host ""
