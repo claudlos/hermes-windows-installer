@@ -1,4 +1,4 @@
-﻿
+
 # ============================================================================
 #  Hermes Agent - Windows Installer (builds from current branch)
 #
