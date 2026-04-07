@@ -1,7 +1,7 @@
 # ============================================================================
 #  Hermes Agent - Windows Installer (builds from current branch)
 #
-#  One-liner — paste this into any PowerShell terminal:
+#  One-liner â€” paste this into any PowerShell terminal:
 #    irm https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/install-windows.ps1 | iex
 #
 #  If you hit a TLS/SSL error, run this line first, then the one-liner above:
@@ -344,11 +344,11 @@ if ($DesktopIcon -ne 'none') {
         $iconUrl = "https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/icons/$iconFile"
         try {
             $wc = New-Object System.Net.WebClient
-            $wc.DownloadFile($iconUrl, Join-Path $ICONS_DIR $iconFile)
-            $iconPath = Join-Path $ICONS_DIR $iconFile
+            $wc.DownloadFile($iconUrl, "$ICONS_DIR\$iconFile")
+            $iconPath = "$ICONS_DIR\$iconFile"
             Write-Ok "Icon downloaded ($iconFile)"
         } catch {
-            Write-Dim "Icon download failed: $_ — skipping shortcut"
+            Write-Dim "Icon download failed: $_ â€” skipping shortcut"
         }
     }
 
@@ -365,7 +365,7 @@ if ($DesktopIcon -ne 'none') {
         $sc.Save()
         Write-Ok "Desktop shortcut created ($DesktopIcon)"
     } else {
-        Write-Dim "Icon not found — skipping shortcut"
+        Write-Dim "Icon not found â€” skipping shortcut"
     }
 }
 
@@ -385,7 +385,7 @@ Write-Host "  ============================================" -ForegroundColor Gre
 Write-Host "   Hermes Agent installed successfully" -ForegroundColor Green
 Write-Host "  ============================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Next step — open a NEW terminal and run:" -ForegroundColor White
+Write-Host "  Next step â€” open a NEW terminal and run:" -ForegroundColor White
 Write-Host ""
 Write-Host "      hermes setup" -ForegroundColor Yellow
 Write-Host ""
