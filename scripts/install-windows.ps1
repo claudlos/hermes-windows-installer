@@ -27,7 +27,7 @@ try {
 } catch {}
 
 $ErrorActionPreference = "Stop"
-$ProgressPreference = "Bypass"
+$psVer = $PSVersionTable.PSVersion.Major; if ($psVer -ge 7) { $psVer = $PSVersionTable.PSVersion.Major; if ($psVer -ge 7) { $ProgressPreference = "Bypass" } else { $ProgressPreference = "SilentlyContinue" } } else { $ProgressPreference = "SilentlyContinue" }
 
 # Where to install
 $INSTALL_DIR = "$env:LOCALAPPDATA\hermes-agent"
