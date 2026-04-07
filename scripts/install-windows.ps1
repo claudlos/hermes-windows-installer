@@ -1,7 +1,7 @@
 # ============================================================================
-#  Hermes Agent - Windows Installer (builds from current branch)
+#  Hermes Agent - Windows Installer
 #
-#  One-liner â€” paste this into any PowerShell terminal:
+#  One-liner -- paste this into any PowerShell terminal:
 #    irm https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/install-windows.ps1 | iex
 #
 #  If you hit a TLS/SSL error, run this line first, then the one-liner above:
@@ -47,7 +47,6 @@ if ($FROM_REPO) {
     if (-not $BRANCH) { $BRANCH = "windows-qol-v2" }
     $REPO_URL = "https://github.com/claudlos/hermes-agent.git"
 } else {
-    # Downloaded standalone - clone the same branch/fork this installer comes from.
     $SOURCE_DIR = $null
     $REPO_URL = "https://github.com/claudlos/hermes-agent.git"
     $BRANCH = "windows-qol-v2"
@@ -156,8 +155,6 @@ if (-not $FROM_REPO) {
 Write-Step 3 "Preparing source..."
 
 if ($FROM_REPO) {
-    # Prefer a shallow clone over a full robocopy sync (much faster for large repos).
-    # Fall back to robocopy only if git clone fails.
     if ($SOURCE_DIR -ne $INSTALL_DIR) {
         $clonedOk = $false
         if (Test-Path "$INSTALL_DIR\.git") {
@@ -209,23 +206,16 @@ if ($FROM_REPO) {
         Write-Ok "Installing from current directory"
     }
 } else {
-    # Clone from GitHub
     if (Test-Path "$INSTALL_DIR\.git") {
         Write-Dim "Updating existing clone..."
         Push-Location $INSTALL_DIR
         try {
             $fetchExit = Invoke-GitQuiet @('fetch', 'origin', $BRANCH)
-            if ($fetchExit -ne 0) {
-                Fail "git fetch failed for branch $BRANCH"
-            }
+            if ($fetchExit -ne 0) { Fail "git fetch failed for branch $BRANCH" }
             $checkoutExit = Invoke-GitQuiet @('checkout', $BRANCH)
-            if ($checkoutExit -ne 0) {
-                Fail "git checkout failed for branch $BRANCH"
-            }
+            if ($checkoutExit -ne 0) { Fail "git checkout failed for branch $BRANCH" }
             $pullExit = Invoke-GitQuiet @('pull', 'origin', $BRANCH)
-            if ($pullExit -ne 0) {
-                Fail "git pull failed for branch $BRANCH"
-            }
+            if ($pullExit -ne 0) { Fail "git pull failed for branch $BRANCH" }
         } finally {
             Pop-Location
         }
@@ -236,9 +226,7 @@ if ($FROM_REPO) {
         }
         Write-Dim "Cloning..."
         $cloneExit = Invoke-GitQuiet @('clone', '--depth', '1', '--branch', $BRANCH, $REPO_URL, $INSTALL_DIR)
-        if ($cloneExit -ne 0) {
-            Write-Err "Clone failed"; exit 1
-        }
+        if ($cloneExit -ne 0) { Write-Err "Clone failed"; exit 1 }
         Write-Ok "Cloned $BRANCH"
     }
 }
@@ -249,15 +237,12 @@ Write-Step 4 "Setting up Python environment..."
 if (-not (Test-Path "$VENV_DIR\Scripts\python.exe")) {
     Write-Dim "Creating virtual environment..."
     & $python -m venv $VENV_DIR
-    if ($LASTEXITCODE -ne 0) {
-        Write-Err "Failed to create venv"; exit 1
-    }
+    if ($LASTEXITCODE -ne 0) { Write-Err "Failed to create venv"; exit 1 }
 }
 
 $venvPython = "$VENV_DIR\Scripts\python.exe"
 $venvPip = "$VENV_DIR\Scripts\pip.exe"
 
-# Upgrade pip silently
 & $venvPython -m pip install --upgrade pip --quiet 2>&1 | Out-Null
 Write-Ok "Virtual environment ready"
 
@@ -270,18 +255,11 @@ $installTarget = "$INSTALL_DIR[keyring,pty]"
 if ($LASTEXITCODE -ne 0) {
     Write-Dim "Retrying with full output..."
     & $venvPip install -e $installTarget
-    if ($LASTEXITCODE -ne 0) {
-        Write-Err "Install failed"; exit 1
-    }
+    if ($LASTEXITCODE -ne 0) { Write-Err "Install failed"; exit 1 }
 }
 
-# Verify the binary exists
 $hermesExe = "$VENV_DIR\Scripts\hermes.exe"
-if (-not (Test-Path $hermesExe)) {
-    Write-Err "hermes.exe not found after install"
-    exit 1
-}
-
+if (-not (Test-Path $hermesExe)) { Write-Err "hermes.exe not found after install"; exit 1 }
 Write-Ok "Hermes Agent installed"
 
 # -- Step 6: Create launcher -------------------------------------------------
@@ -291,13 +269,11 @@ if (-not (Test-Path $BIN_DIR)) {
     New-Item -ItemType Directory -Path $BIN_DIR -Force | Out-Null
 }
 
-# hermes.bat - wrapper that activates venv and runs hermes
 $launcherLines = @(
     '@echo off',
     ('"{0}" %*' -f $hermesExe)
 )
 Set-Content "$BIN_DIR\hermes.bat" -Value $launcherLines -Encoding ASCII
-
 Write-Ok "hermes.bat -> $BIN_DIR"
 
 # -- Step 7: PATH ------------------------------------------------------------
@@ -317,38 +293,37 @@ if ($userPath -notlike "*$BIN_DIR*") {
 if ($DesktopIcon -ne 'none') {
     Write-Step 8 "Creating desktop shortcut..."
 
-    # Find or download the icon
     $iconFile = if ($DesktopIcon -eq 'staff') { 'hermes-staff.ico' } else { 'hermes-nous.ico' }
 
-    # Try local paths first
     $iconPath = $null
     if ($SCRIPT_PATH) {
         $localIcon = Join-Path (Split-Path -Parent $SCRIPT_PATH) "icons\$iconFile"
         if (Test-Path $localIcon) { $iconPath = $localIcon }
     }
     if (-not $iconPath) {
-        $localIcon = Join-Path $INSTALL_DIR "scripts\icons\$iconFile"
+        $localIcon = "$INSTALL_DIR\scripts\icons\$iconFile"
         if (Test-Path $localIcon) { $iconPath = $localIcon }
     }
     if (-not $iconPath) {
-        $localIcon = Join-Path $ICONS_DIR $iconFile
+        $localIcon = "$ICONS_DIR\$iconFile"
         if (Test-Path $localIcon) { $iconPath = $localIcon }
     }
 
-    # Standalone / irm mode: download icon from the installer repo
+    # Standalone / irm mode: download icon from installer repo
     if (-not $iconPath) {
         Write-Dim "Downloading desktop icon..."
         if (-not (Test-Path $ICONS_DIR)) {
             New-Item -ItemType Directory -Path $ICONS_DIR -Force | Out-Null
         }
         $iconUrl = "https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/icons/$iconFile"
+        $iconDest = "$ICONS_DIR\$iconFile"
         try {
             $wc = New-Object System.Net.WebClient
-            $wc.DownloadFile($iconUrl, "$ICONS_DIR\$iconFile")
-            $iconPath = "$ICONS_DIR\$iconFile"
+            $wc.DownloadFile($iconUrl, $iconDest)
+            $iconPath = $iconDest
             Write-Ok "Icon downloaded ($iconFile)"
         } catch {
-            Write-Dim "Icon download failed: $_ â€” skipping shortcut"
+            Write-Dim "Icon download failed - skipping shortcut"
         }
     }
 
@@ -365,7 +340,7 @@ if ($DesktopIcon -ne 'none') {
         $sc.Save()
         Write-Ok "Desktop shortcut created ($DesktopIcon)"
     } else {
-        Write-Dim "Icon not found â€” skipping shortcut"
+        Write-Dim "Icon not found - skipping shortcut"
     }
 }
 
@@ -373,11 +348,7 @@ if ($DesktopIcon -ne 'none') {
 Write-Step 9 "Verifying install..."
 
 $verifyOut = & $hermesExe --version 2>&1
-if ($verifyOut) {
-    Write-Ok $verifyOut
-} else {
-    Write-Ok "Binary runs"
-}
+if ($verifyOut) { Write-Ok $verifyOut } else { Write-Ok "Binary runs" }
 
 # -- Done --------------------------------------------------------------------
 Write-Host ""
@@ -385,7 +356,7 @@ Write-Host "  ============================================" -ForegroundColor Gre
 Write-Host "   Hermes Agent installed successfully" -ForegroundColor Green
 Write-Host "  ============================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Next step â€” open a NEW terminal and run:" -ForegroundColor White
+Write-Host "  Next step - open a NEW terminal and run:" -ForegroundColor White
 Write-Host ""
 Write-Host "      hermes setup" -ForegroundColor Yellow
 Write-Host ""
