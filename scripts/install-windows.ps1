@@ -31,6 +31,14 @@ try {
 $ErrorActionPreference = "Stop"
 if ($PSVersionTable.PSVersion.Major -ge 7) { $ProgressPreference = "Bypass" } else { $ProgressPreference = "SilentlyContinue" }
 
+# Error log for troubleshooting
+$LOG_FILE = "$env:TEMP\hermes-install.log"
+function Write-Log($msg) {
+    $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    "$stamp  $msg" | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
+    Write-Host "      [LOG] $msg" -ForegroundColor DarkGray
+}
+
 $INSTALL_DIR = "$env:LOCALAPPDATA\hermes-agent"
 $VENV_DIR = "$INSTALL_DIR\.venv"
 $BIN_DIR = "$env:LOCALAPPDATA\Programs\hermes"
@@ -56,7 +64,18 @@ function Write-Step($n, $msg) { Write-Host "`n  [$n] " -NoNewline -ForegroundCol
 function Write-Ok($msg)      { Write-Host "      $msg" -ForegroundColor Green }
 function Write-Dim($msg)     { Write-Host "      $msg" -ForegroundColor DarkGray }
 function Write-Err($msg)     { Write-Host "      $msg" -ForegroundColor Red }
-function Fail($msg)          { Write-Err $msg; exit 1 }
+function Fail($msg) {
+    Write-Err $msg
+    Write-Log "FAIL: $msg"
+    if ($Global:Error -and $Global:Error[0]) {
+        Write-Log ("ERROR DETAILS: " + $Global:Error[0].Exception.Message)
+    }
+    Write-Host ""
+    Write-Host "  Error log: $LOG_FILE" -ForegroundColor Yellow
+    Write-Host "  Press Enter to exit..." -ForegroundColor Yellow
+    Read-Host
+    exit 1
+}
 function Invoke-GitQuiet {
     param(
         [Parameter(Mandatory = $true)]
@@ -72,6 +91,9 @@ function Invoke-GitQuiet {
     }
 }
 
+Write-Log "=== Hermes Install Started ==="
+Write-Log "FROM_REPO=$FROM_REPO, BRANCH=$BRANCH"
+
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor DarkYellow
 Write-Host "   Hermes Agent - Windows Installer" -ForegroundColor Yellow
@@ -85,12 +107,12 @@ if ($FROM_REPO) {
 }
 
 Write-Step 1 "Checking Python..."
+Write-Log "Step 1: Checking Python"
 
 $python = $null
 if ($PythonExe) {
     if (-not (Test-Path $PythonExe)) {
-        Write-Err "Requested Python not found: $PythonExe"
-        exit 1
+        Fail "Requested Python not found: $PythonExe"
     }
     try {
         $ver = & $PythonExe --version 2>&1
@@ -99,12 +121,12 @@ if ($PythonExe) {
             if ($minor -ge 10) {
                 $python = $PythonExe
                 Write-Ok "Using explicit Python: $ver"
+                Write-Log "Using explicit Python: $ver"
             }
         }
     } catch {}
     if (-not $python) {
-        Write-Err "Explicit Python must be 3.10+: $PythonExe"
-        exit 1
+        Fail "Explicit Python must be 3.10+: $PythonExe"
     }
 } else {
     foreach ($cmd in @("python3", "python", "py")) {
@@ -115,6 +137,7 @@ if ($PythonExe) {
                 if ($minor -ge 10) {
                     $python = $cmd
                     Write-Ok "Found $ver"
+                    Write-Log "Found Python: $ver via $cmd"
                     break
                 }
             }
@@ -129,56 +152,67 @@ if (-not $python) {
     Write-Host "  Check 'Add Python to PATH' during install." -ForegroundColor DarkGray
     Write-Host "  Or pass a custom interpreter: .\scripts\install-windows.ps1 -PythonExe C:\path\to\python.exe" -ForegroundColor DarkGray
     Write-Host ""
-    exit 1
+    Fail "Python not found"
 }
 
 if (-not $FROM_REPO) {
     Write-Step 2 "Checking Git..."
+    Write-Log "Step 2: Checking Git"
     try {
         $gitVer = & git --version 2>&1
         Write-Ok $gitVer
+        Write-Log "Git found: $gitVer"
     } catch {
         Write-Err "Git not found. Install from https://git-scm.com/download/win"
-        exit 1
+        Fail "Git not found"
     }
 } else {
     Write-Step 2 "Using local repo"
     Write-Ok $SOURCE_DIR
+    Write-Log "Using local repo: $SOURCE_DIR"
 }
 
 Write-Step 3 "Preparing source..."
+Write-Log "Step 3: Preparing source"
 
 if ($FROM_REPO) {
     if ($SOURCE_DIR -ne $INSTALL_DIR) {
         $clonedOk = $false
         if (Test-Path "$INSTALL_DIR\.git") {
             Write-Dim "Updating existing clone at $INSTALL_DIR..."
+            Write-Log "Updating existing clone..."
             Push-Location $INSTALL_DIR
             try {
                 $fetchExit = Invoke-GitQuiet @('fetch', 'origin', $BRANCH, '--depth', '1')
                 $checkoutExit = Invoke-GitQuiet @('checkout', $BRANCH)
                 $resetExit = Invoke-GitQuiet @('reset', '--hard', "origin/$BRANCH")
                 $clonedOk = ($fetchExit -eq 0 -and $checkoutExit -eq 0 -and $resetExit -eq 0)
+                Write-Log "Fetch=$fetchExit, Checkout=$checkoutExit, Reset=$resetExit"
             } finally {
                 Pop-Location
             }
         } else {
             Write-Dim "Shallow-cloning $REPO_URL ($BRANCH) to $INSTALL_DIR..."
+            Write-Log "Shallow cloning $BRANCH..."
             if (Test-Path $INSTALL_DIR) {
                 Remove-Item $INSTALL_DIR -Recurse -Force
             }
             $cloneExit = Invoke-GitQuiet @('clone', '--depth', '1', '--branch', $BRANCH, $REPO_URL, $INSTALL_DIR)
             $clonedOk = ($cloneExit -eq 0)
+            Write-Log "Clone exit: $cloneExit"
         }
         if ($clonedOk) {
             Write-Ok "Source ready via shallow clone ($BRANCH)"
+            Write-Log "Source ready via shallow clone"
         } else {
             Write-Dim "Shallow clone failed; falling back to robocopy sync..."
+            Write-Log "Falling back to robocopy..."
             if (-not (Test-Path $INSTALL_DIR)) {
                 New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
             }
             & robocopy $SOURCE_DIR $INSTALL_DIR /MIR /XD .git .venv __pycache__ .pytest_cache node_modules PCbuild externals /XF "*.pyc" /NFL /NDL /NJH /NJS /NP 2>&1 | Out-Null
             $robocopyCode = $LASTEXITCODE
+            Write-Log "Robocopy exit code: $robocopyCode"
             if ($robocopyCode -ge 8) {
                 Fail "robocopy sync failed with exit code $robocopyCode"
             }
@@ -189,19 +223,23 @@ if ($FROM_REPO) {
                     if ($initExit -eq 0) {
                         $addExit = Invoke-GitQuiet @('add', '-A')
                         $commitExit = Invoke-GitQuiet @('commit', '-m', "install snapshot from $BRANCH", '--quiet')
+                        Write-Log "Robocopy fallback git init: $initExit, commit: $commitExit"
                     }
                 }
             } finally {
                 Pop-Location
             }
             Write-Ok "Source synced via robocopy ($BRANCH)"
+            Write-Log "Source synced via robocopy"
         }
     } else {
         Write-Ok "Installing from current directory"
+        Write-Log "Installing from current directory"
     }
 } else {
     if (Test-Path "$INSTALL_DIR\.git") {
         Write-Dim "Updating existing clone..."
+        Write-Log "Updating existing clone..."
         Push-Location $INSTALL_DIR
         try {
             $fetchExit = Invoke-GitQuiet @('fetch', 'origin', $BRANCH)
@@ -210,6 +248,7 @@ if ($FROM_REPO) {
             if ($checkoutExit -ne 0) { Fail "git checkout failed for branch $BRANCH" }
             $pullExit = Invoke-GitQuiet @('pull', 'origin', $BRANCH)
             if ($pullExit -ne 0) { Fail "git pull failed for branch $BRANCH" }
+            Write-Log "Pull: fetch=$fetchExit checkout=$checkoutExit pull=$pullExit"
         } finally {
             Pop-Location
         }
@@ -219,42 +258,52 @@ if ($FROM_REPO) {
             Remove-Item $INSTALL_DIR -Recurse -Force
         }
         Write-Dim "Cloning..."
+        Write-Log "Cloning fresh..."
         $cloneExit = Invoke-GitQuiet @('clone', '--depth', '1', '--branch', $BRANCH, $REPO_URL, $INSTALL_DIR)
-        if ($cloneExit -ne 0) { Write-Err "Clone failed"; exit 1 }
+        Write-Log "Clone exit: $cloneExit"
+        if ($cloneExit -ne 0) { Fail "Clone failed" }
         Write-Ok "Cloned $BRANCH"
     }
 }
 
 Write-Step 4 "Setting up Python environment..."
+Write-Log "Step 4: Setting up Python environment"
 
 if (-not (Test-Path "$VENV_DIR\Scripts\python.exe")) {
     Write-Dim "Creating virtual environment..."
+    Write-Log "Creating venv..."
     & $python -m venv $VENV_DIR
-    if ($LASTEXITCODE -ne 0) { Write-Err "Failed to create venv"; exit 1 }
+    if ($LASTEXITCODE -ne 0) { Fail "Failed to create venv" }
+    Write-Log "Venv created"
 }
 
 $venvPython = "$VENV_DIR\Scripts\python.exe"
 $venvPip = "$VENV_DIR\Scripts\pip.exe"
 
 & $venvPython -m pip install --upgrade pip --quiet 2>&1 | Out-Null
+Write-Log "Pip upgraded"
 Write-Ok "Virtual environment ready"
 
 Write-Step 5 "Installing Hermes Agent..."
+Write-Log "Step 5: Installing Hermes Agent"
 Write-Dim "This may take a minute on first install..."
 $installTarget = "$INSTALL_DIR[keyring,pty]"
+Write-Log "Installing: $installTarget"
 
 & $venvPip install -e $installTarget --quiet 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Dim "Retrying with full output..."
     & $venvPip install -e $installTarget
-    if ($LASTEXITCODE -ne 0) { Write-Err "Install failed"; exit 1 }
+    if ($LASTEXITCODE -ne 0) { Fail "pip install failed" }
 }
 
 $hermesExe = "$VENV_DIR\Scripts\hermes.exe"
-if (-not (Test-Path $hermesExe)) { Write-Err "hermes.exe not found after install"; exit 1 }
+if (-not (Test-Path $hermesExe)) { Fail "hermes.exe not found after install at $hermesExe" }
 Write-Ok "Hermes Agent installed"
+Write-Log "Hermes installed OK"
 
 Write-Step 6 "Creating launcher..."
+Write-Log "Step 6: Creating launcher"
 
 if (-not (Test-Path $BIN_DIR)) {
     New-Item -ItemType Directory -Path $BIN_DIR -Force | Out-Null
@@ -265,9 +314,11 @@ $launcherLines = @(
     ('"{0}" %*' -f $hermesExe)
 )
 Set-Content "$BIN_DIR\hermes.bat" -Value $launcherLines -Encoding ASCII
+Write-Log "Launcher written to $BIN_DIR\hermes.bat"
 Write-Ok "hermes.bat -> $BIN_DIR"
 
 Write-Step 7 "Configuring PATH..."
+Write-Log "Step 7: Configuring PATH"
 
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($userPath -notlike "*$BIN_DIR*") {
@@ -275,50 +326,83 @@ if ($userPath -notlike "*$BIN_DIR*") {
     $env:Path = "$BIN_DIR;$env:Path"
     Write-Ok "Added to PATH"
     Write-Dim "Restart your terminal for PATH to take effect"
+    Write-Log "PATH updated"
 } else {
     Write-Ok "Already in PATH"
+    Write-Log "PATH already set"
 }
 
 if ($DesktopIcon -ne 'none') {
     Write-Step 8 "Creating desktop shortcut..."
+    Write-Log "Step 8: Creating desktop shortcut"
 
     $iconFile = if ($DesktopIcon -eq 'staff') { 'hermes-staff.ico' } else { 'hermes-nous.ico' }
+    Write-Log "Icon file: $iconFile"
 
     $iconPath = $null
     if ($SCRIPT_PATH) {
         $localIcon = Join-Path (Split-Path -Parent $SCRIPT_PATH) "icons\$iconFile"
-        if (Test-Path $localIcon) { $iconPath = $localIcon }
+        if (Test-Path $localIcon) {
+            $iconPath = $localIcon
+            Write-Log "Icon found locally: $iconPath"
+        }
     }
     if (-not $iconPath) {
         $localIcon = "$INSTALL_DIR\scripts\icons\$iconFile"
-        if (Test-Path $localIcon) { $iconPath = $localIcon }
+        if (Test-Path $localIcon) {
+            $iconPath = $localIcon
+            Write-Log "Icon found in INSTALL_DIR: $iconPath"
+        }
     }
     if (-not $iconPath) {
         $localIcon = "$ICONS_DIR\$iconFile"
-        if (Test-Path $localIcon) { $iconPath = $localIcon }
+        if (Test-Path $localIcon) {
+            $iconPath = $localIcon
+            Write-Log "Icon found in ICONS_DIR: $iconPath"
+        }
     }
 
     if (-not $iconPath) {
         Write-Dim "Downloading desktop icon..."
+        Write-Log "Icon not found locally, downloading from GitHub..."
         if (-not (Test-Path $ICONS_DIR)) {
             New-Item -ItemType Directory -Path $ICONS_DIR -Force | Out-Null
         }
         $iconUrl = "https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/icons/$iconFile"
         $iconDest = "$ICONS_DIR\$iconFile"
+        Write-Log "Icon URL: $iconUrl"
+        Write-Log "Icon dest: $iconDest"
+
         try {
-            $wc = New-Object System.Net.WebClient
-            $wc.Headers.Add("User-Agent", "hermes-windows-installer")
-            $wc.DownloadFile($iconUrl, $iconDest)
+            # Use Invoke-WebRequest which handles TLS properly
+            Invoke-WebRequest -Uri $iconUrl -OutFile $iconDest -UseBasicParsing -TimeoutSec 30
+            Write-Log "Invoke-WebRequest succeeded"
             $iconPath = $iconDest
             Write-Ok "Icon downloaded ($iconFile)"
         } catch {
-            Write-Dim "Icon download failed - skipping shortcut"
+            Write-Log "Invoke-WebRequest FAILED: $($_.Exception.Message)"
+            # Fallback: try .NET WebClient
+            try {
+                Write-Dim "Fallback: trying WebClient..."
+                Write-Log "Trying WebClient fallback..."
+                $wc = New-Object System.Net.WebClient
+                $wc.Headers.Add("User-Agent", "hermes-windows-installer")
+                $wc.DownloadFile($iconUrl, $iconDest)
+                $iconPath = $iconDest
+                Write-Log "WebClient fallback succeeded"
+                Write-Ok "Icon downloaded via WebClient ($iconFile)"
+            } catch {
+                Write-Log "WebClient also FAILED: $($_.Exception.Message)"
+                Write-Dim "Icon download failed - skipping shortcut"
+            }
         }
     }
 
     if ($iconPath -and (Test-Path $iconPath)) {
+        Write-Log "Creating shortcut with icon: $iconPath"
         $desktopPath = [Environment]::GetFolderPath('Desktop')
         $shortcutPath = Join-Path $desktopPath 'Hermes Agent.lnk'
+        Write-Log "Shortcut path: $shortcutPath"
         $ws = New-Object -ComObject WScript.Shell
         $sc = $ws.CreateShortcut($shortcutPath)
         $sc.TargetPath = 'cmd.exe'
@@ -327,16 +411,25 @@ if ($DesktopIcon -ne 'none') {
         $sc.IconLocation = $iconPath
         $sc.Description = 'Hermes Agent'
         $sc.Save()
+        Write-Log "Shortcut saved"
         Write-Ok "Desktop shortcut created ($DesktopIcon)"
     } else {
         Write-Dim "Icon not found - skipping shortcut"
+        Write-Log "Shortcut skipped - no icon"
     }
 }
 
 Write-Step 9 "Verifying install..."
+Write-Log "Step 9: Verifying install"
 
 $verifyOut = & $hermesExe --version 2>&1
-if ($verifyOut) { Write-Ok $verifyOut } else { Write-Ok "Binary runs" }
+if ($verifyOut) {
+    Write-Ok $verifyOut
+    Write-Log "Verify OK: $verifyOut"
+} else {
+    Write-Ok "Binary runs"
+    Write-Log "Verify OK"
+}
 
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor Green
@@ -355,3 +448,9 @@ if ($FROM_REPO) {
 Write-Host ("  Installed:  {0}" -f $INSTALL_DIR) -ForegroundColor DarkGray
 Write-Host ("  Launcher:   {0}\hermes.bat" -f $BIN_DIR) -ForegroundColor DarkGray
 Write-Host ""
+Write-Log "=== Install Complete ==="
+Write-Host ""
+Write-Host "  Error log: $LOG_FILE" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "Press Enter to exit..." -ForegroundColor Yellow
+Read-Host
