@@ -20,7 +20,10 @@ param(
     [string]$DesktopIcon = "staff"
 )
 
-# -- TLS fix (needed for irm on some Windows/AV configurations) ------------
+# -- TLS fix ----------------------------------------------------------------
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+} catch {}
 try {
     [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
 } catch {}
@@ -28,19 +31,16 @@ try {
 $ErrorActionPreference = "Stop"
 if ($PSVersionTable.PSVersion.Major -ge 7) { $ProgressPreference = "Bypass" } else { $ProgressPreference = "SilentlyContinue" }
 
-# Where to install
 $INSTALL_DIR = "$env:LOCALAPPDATA\hermes-agent"
 $VENV_DIR = "$INSTALL_DIR\.venv"
 $BIN_DIR = "$env:LOCALAPPDATA\Programs\hermes"
 $ICONS_DIR = "$INSTALL_DIR\icons"
 
-# Detect: are we running from inside a repo checkout, or downloaded standalone?
 $SCRIPT_PATH = $MyInvocation.MyCommand.Path
 $SCRIPT_DIR = if ($SCRIPT_PATH) { Split-Path -Parent $SCRIPT_PATH } elseif ($PSScriptRoot) { $PSScriptRoot } else { $pwd.Path }
 $REPO_ROOT = Split-Path -Parent $SCRIPT_DIR
 $FROM_REPO = (Test-Path "$REPO_ROOT\.git") -and (Test-Path "$REPO_ROOT\pyproject.toml")
 
-# If running from repo, use that repo and its current branch
 if ($FROM_REPO) {
     $SOURCE_DIR = $REPO_ROOT
     $BRANCH = (& git -C $REPO_ROOT rev-parse --abbrev-ref HEAD 2>$null)
@@ -52,7 +52,6 @@ if ($FROM_REPO) {
     $BRANCH = "windows-qol-v2"
 }
 
-# -- Helpers -----------------------------------------------------------------
 function Write-Step($n, $msg) { Write-Host "`n  [$n] " -NoNewline -ForegroundColor DarkYellow; Write-Host $msg }
 function Write-Ok($msg)      { Write-Host "      $msg" -ForegroundColor Green }
 function Write-Dim($msg)     { Write-Host "      $msg" -ForegroundColor DarkGray }
@@ -63,7 +62,6 @@ function Invoke-GitQuiet {
         [Parameter(Mandatory = $true)]
         [string[]]$Arguments
     )
-
     $prevEAP = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
@@ -74,7 +72,6 @@ function Invoke-GitQuiet {
     }
 }
 
-# -- Banner ------------------------------------------------------------------
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor DarkYellow
 Write-Host "   Hermes Agent - Windows Installer" -ForegroundColor Yellow
@@ -87,7 +84,6 @@ if ($FROM_REPO) {
     Write-Host "  Mode:   Fresh install from GitHub" -ForegroundColor DarkGray
 }
 
-# -- Step 1: Python ----------------------------------------------------------
 Write-Step 1 "Checking Python..."
 
 $python = $null
@@ -136,7 +132,6 @@ if (-not $python) {
     exit 1
 }
 
-# -- Step 2: Git (only needed for clone mode) --------------------------------
 if (-not $FROM_REPO) {
     Write-Step 2 "Checking Git..."
     try {
@@ -151,7 +146,6 @@ if (-not $FROM_REPO) {
     Write-Ok $SOURCE_DIR
 }
 
-# -- Step 3: Source code -----------------------------------------------------
 Write-Step 3 "Preparing source..."
 
 if ($FROM_REPO) {
@@ -231,7 +225,6 @@ if ($FROM_REPO) {
     }
 }
 
-# -- Step 4: Virtual environment ---------------------------------------------
 Write-Step 4 "Setting up Python environment..."
 
 if (-not (Test-Path "$VENV_DIR\Scripts\python.exe")) {
@@ -246,7 +239,6 @@ $venvPip = "$VENV_DIR\Scripts\pip.exe"
 & $venvPython -m pip install --upgrade pip --quiet 2>&1 | Out-Null
 Write-Ok "Virtual environment ready"
 
-# -- Step 5: Install ---------------------------------------------------------
 Write-Step 5 "Installing Hermes Agent..."
 Write-Dim "This may take a minute on first install..."
 $installTarget = "$INSTALL_DIR[keyring,pty]"
@@ -262,7 +254,6 @@ $hermesExe = "$VENV_DIR\Scripts\hermes.exe"
 if (-not (Test-Path $hermesExe)) { Write-Err "hermes.exe not found after install"; exit 1 }
 Write-Ok "Hermes Agent installed"
 
-# -- Step 6: Create launcher -------------------------------------------------
 Write-Step 6 "Creating launcher..."
 
 if (-not (Test-Path $BIN_DIR)) {
@@ -276,7 +267,6 @@ $launcherLines = @(
 Set-Content "$BIN_DIR\hermes.bat" -Value $launcherLines -Encoding ASCII
 Write-Ok "hermes.bat -> $BIN_DIR"
 
-# -- Step 7: PATH ------------------------------------------------------------
 Write-Step 7 "Configuring PATH..."
 
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -289,7 +279,6 @@ if ($userPath -notlike "*$BIN_DIR*") {
     Write-Ok "Already in PATH"
 }
 
-# -- Step 8: Desktop shortcut ------------------------------------------------
 if ($DesktopIcon -ne 'none') {
     Write-Step 8 "Creating desktop shortcut..."
 
@@ -309,7 +298,6 @@ if ($DesktopIcon -ne 'none') {
         if (Test-Path $localIcon) { $iconPath = $localIcon }
     }
 
-    # Standalone / irm mode: download icon from installer repo
     if (-not $iconPath) {
         Write-Dim "Downloading desktop icon..."
         if (-not (Test-Path $ICONS_DIR)) {
@@ -319,6 +307,7 @@ if ($DesktopIcon -ne 'none') {
         $iconDest = "$ICONS_DIR\$iconFile"
         try {
             $wc = New-Object System.Net.WebClient
+            $wc.Headers.Add("User-Agent", "hermes-windows-installer")
             $wc.DownloadFile($iconUrl, $iconDest)
             $iconPath = $iconDest
             Write-Ok "Icon downloaded ($iconFile)"
@@ -344,13 +333,11 @@ if ($DesktopIcon -ne 'none') {
     }
 }
 
-# -- Step 9: Quick verify ----------------------------------------------------
 Write-Step 9 "Verifying install..."
 
 $verifyOut = & $hermesExe --version 2>&1
 if ($verifyOut) { Write-Ok $verifyOut } else { Write-Ok "Binary runs" }
 
-# -- Done --------------------------------------------------------------------
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor Green
 Write-Host "   Hermes Agent installed successfully" -ForegroundColor Green
