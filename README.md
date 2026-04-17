@@ -3,7 +3,6 @@
 ![Hermes on Windows](hermesonwindows.jpg)
 
 One-command Windows installer for [Hermes Agent](https://github.com/NousResearch/hermes-agent).
-Works standalone — does not require the main repo to be merged or changed.
 
 ## Quick Install
 
@@ -77,12 +76,7 @@ Logs are written to:
 
 For detailed Windows documentation, see [WINDOWS.md](WINDOWS.md).
 
-## What is this repo?
+## What's in this repo
 
-This is a standalone packaging of the Windows installer scripts from the
-[hermes-agent windows-qol-v2 branch](https://github.com/claudlos/hermes-agent/tree/windows-qol-v2).
-It exists so Windows users can install Hermes easily regardless of whether the
-Windows support PR gets merged upstream.
-
-The installer fetches the actual Hermes Agent code from GitHub at install time.
-This repo only contains the installer scripts, icons, CPython patch, and docs.
+The installer fetches the Hermes Agent code from GitHub at install time.
+This repo contains the installer scripts, icons, CPython patch, and docs.
