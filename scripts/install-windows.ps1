@@ -52,12 +52,12 @@ $FROM_REPO = (Test-Path "$REPO_ROOT\.git") -and (Test-Path "$REPO_ROOT\pyproject
 if ($FROM_REPO) {
     $SOURCE_DIR = $REPO_ROOT
     $BRANCH = (& git -C $REPO_ROOT rev-parse --abbrev-ref HEAD 2>$null)
-    if (-not $BRANCH) { $BRANCH = "windows-qol-v2" }
+    if (-not $BRANCH) { $BRANCH = "main" }
     $REPO_URL = "https://github.com/claudlos/hermes-agent.git"
 } else {
     $SOURCE_DIR = $null
     $REPO_URL = "https://github.com/claudlos/hermes-agent.git"
-    $BRANCH = "windows-qol-v2"
+    $BRANCH = "main"
 }
 
 function Write-Step($n, $msg) { Write-Host "`n  [$n] " -NoNewline -ForegroundColor DarkYellow; Write-Host $msg }

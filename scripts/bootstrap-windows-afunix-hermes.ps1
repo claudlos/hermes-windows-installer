@@ -34,10 +34,10 @@ function Get-HermesContext {
     $fromRepo = (Test-Path (Join-Path $repoRoot '.git')) -and (Test-Path (Join-Path $repoRoot 'pyproject.toml'))
 
     if ($fromRepo) {
-        $branch = 'windows-qol-v2'
+        $branch = 'main'
         try {
             $branch = (& git -C $repoRoot rev-parse --abbrev-ref HEAD 2>$null)
-            if (-not $branch) { $branch = 'windows-qol-v2' }
+            if (-not $branch) { $branch = 'main' }
         } catch {}
         return @{
             FromRepo = $true
@@ -53,7 +53,7 @@ function Get-HermesContext {
         return @{
             FromRepo = $false
             RepoRoot = $null
-            Branch = 'windows-qol-v2'
+            Branch = 'main'
             RawBase = 'https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main'
             InstallerLocal = Join-Path $repoRoot 'scripts\install-windows.ps1'
         }
@@ -62,7 +62,7 @@ function Get-HermesContext {
     return @{
         FromRepo = $false
         RepoRoot = $null
-        Branch = 'windows-qol-v2'
+        Branch = 'main'
         RawBase = 'https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main'
     }
 }
