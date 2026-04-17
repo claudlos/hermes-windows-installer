@@ -67,6 +67,44 @@ function Invoke-GitQuiet {
     }
 }
 
+function Invoke-NativeQuiet {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [string[]]$Arguments = @()
+    )
+
+    $prevEAP = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $null = & $FilePath @Arguments 2>&1
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
+}
+
+function Remove-StaleHermesMetadata {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SitePackagesDir
+    )
+
+    if (-not (Test-Path $SitePackagesDir)) {
+        return
+    }
+
+    $staleEntries = @(
+        Get-ChildItem -Path $SitePackagesDir -Directory |
+            Where-Object { $_.Name -like '~ermes*.dist-info' -or $_.Name -like '~ermes*.egg-info' }
+    )
+
+    if ($staleEntries.Count -gt 0) {
+        Write-Dim ("Removing stale package metadata: {0}" -f (($staleEntries | Select-Object -ExpandProperty Name) -join ', '))
+        $staleEntries | Remove-Item -Recurse -Force
+    }
+}
+
 # -- Banner ------------------------------------------------------------------
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor DarkYellow
@@ -248,9 +286,19 @@ if (-not (Test-Path "$VENV_DIR\Scripts\python.exe")) {
 
 $venvPython = "$VENV_DIR\Scripts\python.exe"
 $venvPip = "$VENV_DIR\Scripts\pip.exe"
+$sitePackagesDir = "$VENV_DIR\Lib\site-packages"
+
+Remove-StaleHermesMetadata -SitePackagesDir $sitePackagesDir
 
 # Upgrade pip silently
-& $venvPython -m pip install --upgrade pip --quiet 2>&1 | Out-Null
+$pipUpgradeExit = Invoke-NativeQuiet -FilePath $venvPython -Arguments @('-m', 'pip', 'install', '--upgrade', 'pip', '--quiet')
+if ($pipUpgradeExit -ne 0) {
+    Write-Dim "Retrying pip upgrade with full output..."
+    & $venvPython -m pip install --upgrade pip
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "Failed to upgrade pip"; exit 1
+    }
+}
 Write-Ok "Virtual environment ready"
 
 # -- Step 5: Install ---------------------------------------------------------
@@ -258,8 +306,8 @@ Write-Step 5 "Installing Hermes Agent..."
 Write-Dim "This may take a minute on first install..."
 $installTarget = "$INSTALL_DIR[keyring,pty]"
 
-& $venvPip install -e $installTarget --quiet 2>&1
-if ($LASTEXITCODE -ne 0) {
+$installExit = Invoke-NativeQuiet -FilePath $venvPip -Arguments @('install', '-e', $installTarget, '--quiet')
+if ($installExit -ne 0) {
     Write-Dim "Retrying with full output..."
     & $venvPip install -e $installTarget
     if ($LASTEXITCODE -ne 0) {
