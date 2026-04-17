@@ -30,7 +30,7 @@ If the custom build fails, Hermes still gets installed with your stock Python.
 ## What you get
 
 - Hermes Agent installed and ready to use
-- Desktop shortcut with icon (NousResearch girl by default, or golden Hermes staff)
+- Desktop shortcut with icon (golden Hermes staff by default, or NousResearch girl)
 - `hermes` command available in any terminal
 - Credential storage via Windows Credential Manager
 - All Windows-specific fixes included
@@ -46,7 +46,7 @@ hermes
 
 ## Desktop icon options
 
-Default is the NousResearch girl. To use the golden Hermes caduceus:
+Default is the golden Hermes caduceus. To use the NousResearch girl:
 
 ```powershell
 .\scripts\install-windows.ps1 -DesktopIcon staff
