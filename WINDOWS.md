@@ -8,23 +8,23 @@ and Windows 11 with Python 3.10+.
 ### Quick Install (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/install-windows.ps1 | iex
 ```
 
-This installs Python (via uv), Git, Node.js, and sets up Hermes in
+This uses your existing Python 3.10+ install, clones Hermes, and sets up Hermes in
 `%LOCALAPPDATA%\hermes-agent`.
 
 If you're testing a branch or fork that carries newer Windows installer work,
 use that branch's raw script URL instead of the upstream `main` one. Example:
 
 ```powershell
-irm https://raw.githubusercontent.com/<owner>/<branch>/scripts/install-windows.ps1 | iex
+irm https://raw.githubusercontent.com/<owner>/<repo>/<branch>/scripts/install-windows.ps1 | iex
 ```
 
 For the one-command custom AF_UNIX Python + Hermes bootstrap on a branch/fork:
 
 ```powershell
-irm https://raw.githubusercontent.com/<owner>/<branch>/scripts/bootstrap-windows-afunix-hermes.ps1 | iex
+irm https://raw.githubusercontent.com/<owner>/<repo>/<branch>/scripts/bootstrap-windows-afunix-hermes.ps1 | iex
 ```
 
 ### Manual Install
@@ -32,11 +32,11 @@ irm https://raw.githubusercontent.com/<owner>/<branch>/scripts/bootstrap-windows
 ```powershell
 git clone https://github.com/NousResearch/hermes-agent.git
 cd hermes-agent
-pip install -e ".[windows,pty]"
+pip install -e ".[keyring,pty]"
 hermes setup
 ```
 
-The `[windows]` extra installs `keyring` for secure credential storage
+The `[keyring]` extra installs `keyring` for secure credential storage
 via Windows Credential Manager.
 
 ### One-command AF_UNIX bootstrap

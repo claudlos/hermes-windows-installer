@@ -30,7 +30,7 @@ If the custom build fails, Hermes still gets installed with your stock Python.
 ## What you get
 
 - Hermes Agent installed and ready to use
-- Desktop shortcut with icon (NousResearch girl by default, or golden Hermes staff)
+- Desktop shortcut with icon (golden Hermes staff by default, or NousResearch girl)
 - `hermes` command available in any terminal
 - Credential storage via Windows Credential Manager
 - All Windows-specific fixes included
@@ -46,7 +46,7 @@ hermes
 
 ## Desktop icon options
 
-Default is the NousResearch girl. To use the golden Hermes caduceus:
+Default is the golden Hermes caduceus. To use the NousResearch girl:
 
 ```powershell
 .\scripts\install-windows.ps1 -DesktopIcon staff
@@ -78,11 +78,6 @@ Logs are written to:
 For detailed Windows documentation, see [WINDOWS.md](WINDOWS.md).
 
 ## What is this repo?
-
-This is a standalone packaging of the Windows installer scripts from the
-[hermes-agent windows-qol-v2 branch](https://github.com/claudlos/hermes-agent/tree/windows-qol-v2).
-It exists so Windows users can install Hermes easily regardless of whether the
-Windows support PR gets merged upstream.
 
 The installer fetches the actual Hermes Agent code from GitHub at install time.
 This repo only contains the installer scripts, icons, CPython patch, and docs.

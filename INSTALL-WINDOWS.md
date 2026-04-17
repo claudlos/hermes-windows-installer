@@ -7,13 +7,16 @@ Three ways to install, from easiest to most advanced.
 Open PowerShell and paste:
 
 ```powershell
-irm https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/install-windows.ps1 | iex
 ```
 
-That's it. Open a new terminal and run `hermes setup` to configure your API key.
+This uses your existing Python 3.10+ install, clones Hermes, and sets it up in
+`%LOCALAPPDATA%\hermes-agent`.
 
-A desktop shortcut with the NousResearch icon is created automatically.
-To use the golden Hermes staff icon instead:
+Then open a new terminal and run `hermes setup` to configure your API key.
+
+A desktop shortcut with the golden Hermes staff icon is created automatically.
+To use the NousResearch icon instead:
 
 ```powershell
 .\scripts\install-windows.ps1 -DesktopIcon staff
@@ -31,7 +34,7 @@ This builds a custom Python with AF_UNIX socket support and installs Hermes
 with it. AF_UNIX gives the code execution sandbox better isolation.
 
 ```powershell
-irm https://raw.githubusercontent.com/claudlos/hermes-agent/windows-qol-v2/scripts/bootstrap-windows-afunix-hermes.ps1 | iex
+irm https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main/scripts/bootstrap-windows-afunix-hermes.ps1 | iex
 ```
 
 What it does automatically:
@@ -65,10 +68,10 @@ hermes setup
 
 ## Desktop Icon Options
 
-The installer creates a desktop shortcut by default. Two icon choices:
+The installer creates a desktop shortcut with the staff icon by default. Two icon choices:
 
-- **nous** (default) — the NousResearch girl
-- **staff** — golden Hermes caduceus
+- **staff** (default) — golden Hermes caduceus
+- **nous** — the NousResearch girl
 
 Change it anytime by rerunning:
 

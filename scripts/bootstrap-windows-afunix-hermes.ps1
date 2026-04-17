@@ -34,10 +34,10 @@ function Get-HermesContext {
     $fromRepo = (Test-Path (Join-Path $repoRoot '.git')) -and (Test-Path (Join-Path $repoRoot 'pyproject.toml'))
 
     if ($fromRepo) {
-        $branch = 'windows-qol-v2'
+        $branch = 'main'
         try {
             $branch = (& git -C $repoRoot rev-parse --abbrev-ref HEAD 2>$null)
-            if (-not $branch) { $branch = 'windows-qol-v2' }
+            if (-not $branch) { $branch = 'main' }
         } catch {}
         return @{
             FromRepo = $true
@@ -53,7 +53,7 @@ function Get-HermesContext {
         return @{
             FromRepo = $false
             RepoRoot = $null
-            Branch = 'windows-qol-v2'
+            Branch = 'main'
             RawBase = 'https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main'
             InstallerLocal = Join-Path $repoRoot 'scripts\install-windows.ps1'
         }
@@ -62,7 +62,7 @@ function Get-HermesContext {
     return @{
         FromRepo = $false
         RepoRoot = $null
-        Branch = 'windows-qol-v2'
+        Branch = 'main'
         RawBase = 'https://raw.githubusercontent.com/claudlos/hermes-windows-installer/main'
     }
 }
@@ -101,8 +101,8 @@ function Get-BuildToolsInstallPath {
     $fallbacks = @(
         "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools",
         "$env:ProgramFiles\Microsoft Visual Studio\2022\BuildTools",
-        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\18\BuildTools",
-        "$env:ProgramFiles\Microsoft Visual Studio\18\BuildTools"
+        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\BuildTools",
+        "$env:ProgramFiles\Microsoft Visual Studio\2019\BuildTools"
     )
     foreach ($candidate in $fallbacks) {
         if (Test-Path (Join-Path $candidate 'VC\Auxiliary\Build\vcvarsall.bat')) {
@@ -155,7 +155,7 @@ function Ensure-BuildTools {
         Download-File -url 'https://aka.ms/vs/17/release/vs_BuildTools.exe' -dest $bootstrapper
     }
 
-    $installPath = "$env:ProgramFiles(x86)\Microsoft Visual Studio\2022\BuildTools"
+    $installPath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools"
     $args = @(
         '--quiet', '--wait', '--norestart', '--nocache',
         '--installPath', $installPath,
